@@ -79,6 +79,11 @@ public class SpeechRecognition: CAPPlugin {
 
             let inputNode: AVAudioInputNode = self.audioEngine!.inputNode
             let format: AVAudioFormat = inputNode.outputFormat(forBus: 0)
+            
+            if (self.recognitionRequest == nil) {
+                call.reject(self.MESSAGE_UNKNOWN)
+                return
+            }
 
             self.recognitionTask = self.speechRecognizer?.recognitionTask(with: self.recognitionRequest!, resultHandler: { (result, error) in
                 if (result != nil) {
@@ -101,7 +106,7 @@ public class SpeechRecognition: CAPPlugin {
                     }
 
 
-                    if result!.isFinal {
+                    if (!partialResults && result!.isFinal) {
                         self.audioEngine!.stop()
                         self.audioEngine?.inputNode.removeTap(onBus: 0)
                         self.recognitionTask = nil
@@ -109,7 +114,7 @@ public class SpeechRecognition: CAPPlugin {
                     }
                 }
 
-                if (error != nil) {
+                if (!partialResults && error != nil) {
                     self.audioEngine!.stop()
                     self.audioEngine?.inputNode.removeTap(onBus: 0)
                     self.recognitionRequest = nil
@@ -138,8 +143,11 @@ public class SpeechRecognition: CAPPlugin {
     @objc func stop(_ call: CAPPluginCall) {
         DispatchQueue.global(qos: DispatchQoS.QoSClass.default).async {
             if let engine = self.audioEngine, engine.isRunning {
-                engine.stop()
                 self.recognitionRequest?.endAudio()
+                engine.stop()
+                engine.inputNode.removeTap(onBus: 0)
+                self.recognitionRequest = nil
+                self.recognitionTask = nil
             }
             call.resolve()
         }
